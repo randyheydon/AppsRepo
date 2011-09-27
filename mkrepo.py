@@ -90,7 +90,7 @@ def generate_json(storage_dir, output):
             try:
                 l['title'] = titles[lang]
                 l['description'] = descriptions[lang]
-            except IndexError: pass
+            except KeyError: pass
             package['localizations'][lang] = l
 
         package['size'] = os.path.getsize(fpath)
@@ -119,5 +119,5 @@ def generate_json(storage_dir, output):
 if __name__ == '__main__':
     storage = '/media/disk/pnd_storage'
     outfile = '/home/randy/www/extra/repo.json'
-    download_apps(storage)
+    #download_apps(storage)
     generate_json(storage, outfile)
