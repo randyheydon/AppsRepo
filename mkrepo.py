@@ -33,85 +33,89 @@ def generate_json(storage_dir, output):
     seek_jump = -window + len(pxml_start_key)*2
 
     for fname in (i for i in os.listdir(storage_dir) if i.endswith('.pnd')):
-        print 'Parsing', fname
-
-        fpath = os.path.join(storage_dir, fname)
-        f = open(fpath, 'rb')
-        f.seek(-window, os.SEEK_END)
-        # Seek backwards to start of PXML.
-        pxml_start = -1
-        while pxml_start == -1:
-            text = f.read(window)
-            f.seek(seek_jump-window, os.SEEK_CUR)
-            pxml_start = text.rfind(pxml_start_key)
-        f.seek(pxml_start-seek_jump, os.SEEK_CUR)
-
-        # Read remainder of file, then remove everything after end of PXML.
-        pxml = f.read().split(pxml_end_key, 1)[0] + pxml_end_key
-        # Strip out the stupid goddamn namespace stuff that I hate.
-        pxml = '<PXML>' + pxml.split('>',1)[1]
-
-        # Parse PXML through lxml.etree.
-        parser = etree.XMLParser(recover=True, remove_comments=True)
-        root = etree.fromstring(pxml, parser)
-
-        # Extract relevant data.
-        package = {}
-        package['id'] = root.xpath('/PXML/*/@id')[0]
-        package['uri'] = download_uri % fname[:-4]
-
-        package['version'] = {'major':'0', 'minor':'0', 'release':'0',
-            'build':'0', 'type':'release'}
         try:
-            version = root.xpath('/PXML/*/version')[0]
-            package['version']['major'] = version.xpath('@major')[0]
-            package['version']['minor'] = version.xpath('@minor')[0]
-            package['version']['release'] = version.xpath('@release')[0]
-            package['version']['build'] = version.xpath('@build')[0]
-            package['version']['type'] = version.xpath('@type')[0]
-        except IndexError: pass
+            print 'Parsing', fname
 
-        titles = {}
-        for title in root.xpath('''/PXML/package/titles/title | /PXML/package/title
-            | /PXML/application[1]/titles/title | /PXML/application[1]/title'''):
-            lang = title.get('lang')
-            if lang is not None and lang not in titles:
-                titles[lang] = title.text
-        descriptions = {}
-        for desc in root.xpath('''/PXML/package/descriptions/description |
-            /PXML/package/description | /PXML/application[1]/descriptions/description
-            | /PXML/application[1]/description'''):
-            lang = desc.get('lang')
-            if lang is not None and lang not in descriptions:
-                descriptions[lang] = desc.text
-        package['localizations'] = {}
-        for lang in titles.iterkeys():
-            l = {}
+            fpath = os.path.join(storage_dir, fname)
+            f = open(fpath, 'rb')
+            f.seek(-window, os.SEEK_END)
+            # Seek backwards to start of PXML.
+            pxml_start = -1
+            while pxml_start == -1:
+                text = f.read(window)
+                f.seek(seek_jump-window, os.SEEK_CUR)
+                pxml_start = text.rfind(pxml_start_key)
+            f.seek(pxml_start-seek_jump, os.SEEK_CUR)
+
+            # Read remainder of file, then remove everything after end of PXML.
+            pxml = f.read().split(pxml_end_key, 1)[0] + pxml_end_key
+            # Strip out the stupid goddamn namespace stuff that I hate.
+            pxml = '<PXML>' + pxml.split('>',1)[1]
+
+            # Parse PXML through lxml.etree.
+            parser = etree.XMLParser(recover=True, remove_comments=True)
+            root = etree.fromstring(pxml, parser)
+
+            # Extract relevant data.
+            package = {}
+            package['id'] = root.xpath('/PXML/*/@id')[0]
+            package['uri'] = download_uri % fname[:-4]
+
+            package['version'] = {'major':'0', 'minor':'0', 'release':'0',
+                'build':'0', 'type':'release'}
             try:
-                l['title'] = titles[lang]
-                l['description'] = descriptions[lang]
-            except KeyError: pass
-            package['localizations'][lang] = l
+                version = root.xpath('/PXML/*/version')[0]
+                package['version']['major'] = version.xpath('@major')[0]
+                package['version']['minor'] = version.xpath('@minor')[0]
+                package['version']['release'] = version.xpath('@release')[0]
+                package['version']['build'] = version.xpath('@build')[0]
+                package['version']['type'] = version.xpath('@type')[0]
+            except IndexError: pass
 
-        package['size'] = os.path.getsize(fpath)
+            titles = {}
+            for title in root.xpath('''/PXML/package/titles/title | /PXML/package/title
+                | /PXML/application[1]/titles/title | /PXML/application[1]/title'''):
+                lang = title.get('lang')
+                if lang is not None and lang not in titles:
+                    titles[lang] = title.text
+            descriptions = {}
+            for desc in root.xpath('''/PXML/package/descriptions/description |
+                /PXML/package/description | /PXML/application[1]/descriptions/description
+                | /PXML/application[1]/description'''):
+                lang = desc.get('lang')
+                if lang is not None and lang not in descriptions:
+                    descriptions[lang] = desc.text
+            package['localizations'] = {}
+            for lang in titles.iterkeys():
+                l = {}
+                try:
+                    l['title'] = titles[lang]
+                    l['description'] = descriptions[lang]
+                except KeyError: pass
+                package['localizations'][lang] = l
 
-        # TODO: Calculate MD5.
+            package['size'] = os.path.getsize(fpath)
 
-        try:
-            author = root.xpath('/PXML/*/author')[0]
-            package['author'] = {}
-            for i in ('name', 'website', 'email'):
-                j = author.get(i)
-                if j is not None:
-                    package['author'][i] = j
-        except IndexError: pass
+            # TODO: Calculate MD5.
 
-        # TODO: Icons, previewpics from apps.o.o.
+            try:
+                author = root.xpath('/PXML/*/author')[0]
+                package['author'] = {}
+                for i in ('name', 'website', 'email'):
+                    j = author.get(i)
+                    if j is not None:
+                        package['author'][i] = j
+            except IndexError: pass
 
-        package['categories'] = list(set(root.xpath('/PXML/application/categories//@name')))
+            # TODO: Icons, previewpics from apps.o.o.
 
-        # Add package to list.
-        repo_data['packages'].append(package)
+            package['categories'] = list(set(root.xpath('/PXML/application/categories//@name')))
+
+            # Add package to list.
+            repo_data['packages'].append(package)
+
+        except:
+            print 'Failed to parse', fname
 
     json.dump(repo_data, open(output, 'w'))
 
