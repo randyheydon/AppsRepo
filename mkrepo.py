@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 
 import os, urllib, json
+from hashlib import md5
 from lxml import html, etree
 
 
@@ -37,18 +38,19 @@ def generate_json(storage_dir, output):
             print 'Parsing', fname
 
             fpath = os.path.join(storage_dir, fname)
-            f = open(fpath, 'rb')
-            f.seek(-window, os.SEEK_END)
-            # Seek backwards to start of PXML.
-            pxml_start = -1
-            while pxml_start == -1:
-                text = f.read(window)
-                f.seek(seek_jump-window, os.SEEK_CUR)
-                pxml_start = text.rfind(pxml_start_key)
-            f.seek(pxml_start-seek_jump, os.SEEK_CUR)
+            with open(fpath, 'rb') as f:
+                f.seek(-window, os.SEEK_END)
+                # Seek backwards to start of PXML.
+                pxml_start = -1
+                while pxml_start == -1:
+                    text = f.read(window)
+                    f.seek(seek_jump-window, os.SEEK_CUR)
+                    pxml_start = text.rfind(pxml_start_key)
+                f.seek(pxml_start-seek_jump, os.SEEK_CUR)
 
-            # Read remainder of file, then remove everything after end of PXML.
-            pxml = f.read().split(pxml_end_key, 1)[0] + pxml_end_key
+                # Read remainder of file, then remove everything after end of PXML.
+                pxml = f.read().split(pxml_end_key, 1)[0] + pxml_end_key
+                f.close()
             # Strip out the stupid goddamn namespace stuff that I hate.
             pxml = '<PXML>' + pxml.split('>',1)[1]
 
@@ -96,7 +98,11 @@ def generate_json(storage_dir, output):
 
             package['size'] = os.path.getsize(fpath)
 
-            # TODO: Calculate MD5.
+            m = md5()
+            with open(fpath, 'rb') as p:
+                for chunk in iter(lambda: p.read(128*m.block_size), ''):
+                    m.update(chunk)
+            package['md5'] = m.hexdigest()
 
             try:
                 author = root.xpath('/PXML/*/author')[0]
